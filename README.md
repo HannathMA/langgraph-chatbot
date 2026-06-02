@@ -1,183 +1,33 @@
-# 🤖 Advanced LangGraph Chatbot with Google Search
+# 🤖 Free LangGraph Chatbot (Tavily + LangGraph)
 
-A sophisticated, multi-node chatbot powered by LangGraph that integrates Google Search API for real-time information retrieval and OpenAI GPT for intelligent response generation.
+A lightweight chatbot built with LangGraph and Streamlit that uses the Tavily API for web search responses. The app is designed to run locally with real-time search data and can optionally be extended to use Gemini for response generation.
 
 ## Features
 
-✨ **Multi-Intent Detection**: Automatically detects user intents (greeting, search, support, general questions)
+- Intent detection: greeting, search, general chat
+- Web search via the Tavily API (`tavily-python` client)
+- Free response generation without OpenAI or Gemini by default
+- Optional Gemini API support for richer LLM responses
+- Conversation history persisted in Streamlit session state
+- Simple Streamlit UI for quick local usage
 
-🔍 **Pluggable Web Search Integration**: Uses a `search_web(query)` helper (placeholder) so you can plug in Google Custom Search, Bing, DuckDuckGo, or any other search provider
+## Architecture
 
-🧠 **LLM-Powered Responses**: Uses OpenAI GPT to generate contextual, intelligent responses
-
-📊 **Conversation History**: Maintains and displays chat history with reasoning
-
-🔄 **Complex Workflow**: Multi-node LangGraph workflow with conditional routing
-
-🎨 **Beautiful UI**: Built with Streamlit for an interactive web interface
-
-## System Architecture
+The LangGraph flow in `app.py` is:
 
 ```
 detect_intent
-    ├── greeting → greeting_node
-    ├── search → extract_query → search (web search node) → llm
-    ├── support → support_node
-    └── general_question → generate_response
-
-High-level entry point: `search` → `llm` → END
-All paths → update_history → END
+  ├─ greeting → greeting_node → history
+  ├─ search → extract_query → search (web_search_node) → generate_response → history
+  └─ general → generate_response → history
 ```
 
 ## Prerequisites
 
-- Python 3.9+
-- Virtual environment (venv)
-- Google Search API credentials
-- OpenAI API key
-
-## Setup Instructions
-
-### 1. Install Dependencies
-
-```bash
-# Activate virtual environment
-python -m venv venv
-.\venv\Scripts\activate  # Windows
-# or
-source venv/bin/activate  # macOS/Linux
-
-# Install required packages
-pip install -r requirements.txt
-```
-
-### 2. Configure API Keys
-
-#### Google Search API Setup:
-1. Go to [Google Programmable Search Engine](https://programmablesearchengine.google.com/)
-2. Create a new search engine
-3. Get your Search Engine ID
-4. Enable Custom Search API in [Google Cloud Console](https://console.cloud.google.com/)
-5. Create an API key
-
-#### OpenAI API Setup:
-1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
-2. Generate a new API key
-3. Keep it secure (never share)
-
-#### Set Environment Variables:
-
-**Option A: Create a `.env` file** (recommended for local development)
-```bash
-# Copy the example file
-cp .env.example .env
-
-# Edit .env with your credentials
-GOOGLE_API_KEY=your_key_here
-GOOGLE_SEARCH_ENGINE_ID=your_id_here
-OPENAI_API_KEY=your_key_here
-```
-
-**Option B: Use Streamlit Secrets** (recommended for deployed apps)
-```bash
-# Create ~/.streamlit/secrets.toml (Windows: %userprofile%\.streamlit\secrets.toml)
-GOOGLE_API_KEY = "your_key_here"
-GOOGLE_SEARCH_ENGINE_ID = "your_id_here"
-OPENAI_API_KEY = "your_key_here"
-```
-
-### 3. Run the Application
-
-```bash
-streamlit run app.py
-```
-
-The chatbot will open at `http://localhost:8501`
-
-## Usage Examples
-
-### Greeting
-- User: "Hello"
-- Bot: Responds with a welcome message
-
-### Web Search
-- User: "Find information about artificial intelligence"
-- Bot: Searches Google, fetches results, and provides a comprehensive answer
-
-### Support Query
-- User: "I need help"
-- Bot: Provides available support options
-
-### General Question
-- User: "What is machine learning?"
-- Bot: Uses LLM to generate an answer based on its knowledge
-
-## State Structure
-
-The chatbot maintains the following state:
-
-```python
-class ChatState(TypedDict):
-    message: str                          # User input
-    intent: str                          # Detected intent
-    search_query: str                    # Extracted search query
-    search_results: Optional[List[str]]  # Google search results
-    context: str                         # Formatted search context
-    reasoning: str                       # Explanation of reasoning
-    response: str                        # Final response
-    conversation_history: List[dict]     # Chat history
-    timestamp: str                       # Timestamp
-```
-
-## Node Descriptions
-
-| Node | Purpose |
-|------|---------|
-| `detect_intent` | Analyzes user message to determine intent type |
-| `greeting` | Handles greeting intents |
-| `extract_query` | Extracts search query from message |
-| `search` / `google_search` | Performs web search using `search_web(query)` helper and retrieves results |
-| `generate_response` | Uses LLM to generate response with context |
-| `support` | Handles support-related queries |
-| `update_history` | Updates conversation history |
-
-## Environment Variables
-
-- `GOOGLE_API_KEY`: Your Google Custom Search API key
-# 🤖 FREE LangGraph Chatbot (Tavily + LangGraph)
-
-This repository contains a lightweight chatbot built with LangGraph and Streamlit that performs real-time web searches using the Tavily API (no OpenAI required). It's a cost-free mode by design — search-powered responses are composed from retrieved web content.
-
-## Key Changes
-
-- Replaced OpenAI LLM usage with a free search-driven response generator.
-- Uses the `tavily` Python client for web search results.
-- LangGraph workflow updated to use `detect_intent -> extract_query -> search -> generate -> history`.
-
-## Features
-
-- Intent detection (greeting, search, general)
-- Web search via Tavily (`tavily-python` client)
-- Free-mode response generation (no external LLM costs)
-- Conversation history stored in-session
-- Streamlit UI for quick local usage
-
-## System Architecture
-
-```
-detect_intent
-    ├── greeting → greeting_node → history
-    ├── search → extract_query → search (web_search_node) → generate → history
-    └── general → generate → history
-```
-
-Entry point: `detect_intent` (configured in `app.py`).
-
-## Prerequisites
-
-- Python 3.9+
-- Virtual environment (recommended)
-- Tavily API key (set `TAVILY_API_KEY`)
+- Python 3.9 or newer
+- `venv` virtual environment
+- Tavily API key
+- Optional Gemini API key for LLM-powered responses
 
 ## Setup
 
@@ -190,14 +40,66 @@ python -m venv venv
 source venv/bin/activate    # macOS / Linux
 ```
 
-2. Install dependencies (add `tavily` if not in `requirements.txt`):
+2. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 pip install tavily-python
 ```
 
-3. Set environment variables (create a `.env` file at repo root):
+3. (Optional) Install Gemini integration packages if you want LLM responses:
+
+```bash
+pip install langchain-google-genai google-genai
+```
+
+4. Add your Tavily API key to a `.env` file in the repo root:
+
+```bash
+TAVILY_API_KEY=your_tavily_api_key_here
+```
+
+Optional Gemini environment variable:
+
+```bash
+GOOGLE_API_KEY=your_gemini_api_key_here
+```
+
+If you prefer, you can also set the environment variable directly in your shell.
+
+## Run the App
+
+```bash
+streamlit run app.py
+```
+
+Then open `http://localhost:8501` in your browser.
+
+## Usage
+
+- Ask a greeting: `Hello`
+- Ask a web query: `What is LangGraph?`
+- Ask a general question: `Tell me about free AI chatbots.`
+
+If no search results are found, the app will return a friendly fallback response.
+
+## File Overview
+
+- `app.py`: main Streamlit application and LangGraph workflow
+- `requirements.txt`: Python dependency list
+- `README.md`: project documentation
+
+## Environment Variables
+
+- `TAVILY_API_KEY`: required for the Tavily search client
+
+## Notes
+
+- By default, this app uses Tavily for free search responses and does not require OpenAI/Gemini.
+- Gemini API support can be enabled by installing `langchain-google-genai` and setting `GOOGLE_API_KEY`.
+- The search result behavior is powered by the `tavily-python` package and `search_web()`.
+- Use `streamlit run app.py` to launch the UI and test chat input.
+
 
 ```
 TAVILY_API_KEY=your_tavily_api_key_here
@@ -270,3 +172,6 @@ MIT
 
 Open an issue or edit the code directly to customize behavior.
 - [ ] Implement caching with Redis
+
+
+
