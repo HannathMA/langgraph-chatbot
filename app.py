@@ -1,9 +1,10 @@
 import streamlit as st
 from typing import TypedDict, Optional, List
 from langgraph.graph import StateGraph, END
-import os
 from datetime import datetime
 from dotenv import load_dotenv
+import os
+
 from tavily import TavilyClient
 
 # =========================
@@ -11,21 +12,27 @@ from tavily import TavilyClient
 # =========================
 load_dotenv()
 
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 # =========================
-# TAVILY SETUP
+# TAVILY
 # =========================
 tavily = TavilyClient(api_key=TAVILY_API_KEY)
 
+# =========================
+# WEB SEARCH
+# =========================
 def search_web(query: str):
-    """Web search using Tavily"""
-    response = tavily.search(
-        query=query,
-        search_depth="basic",
-        max_results=5
-    )
-    return response.get("results", [])
+    try:
+        response = tavily.search(
+            query=query,
+            search_depth="basic",
+            max_results=5
+        )
+        return response.get("results", [])
+    except Exception as e:
+        print("Search Error:", e)
+        return []
 
 # =========================
 # STATE
@@ -41,38 +48,56 @@ class ChatState(TypedDict):
     timestamp: str
 
 # =========================
-# 1. INTENT DETECTION
+# INTENT DETECTION
 # =========================
-def detect_intent(state: ChatState) -> dict:
+def detect_intent(state: ChatState):
+
     msg = state["message"].lower()
 
-    if any(w in msg for w in ["hi", "hello", "hey"]):
+    if any(word in msg for word in ["hi", "hello", "hey"]):
         intent = "greeting"
-    elif any(w in msg for w in ["what", "who", "how", "why", "find", "search"]):
+
+    elif any(word in msg for word in [
+        "what",
+        "who",
+        "how",
+        "why",
+        "when",
+        "where",
+        "find",
+        "search",
+        "latest",
+        "news"
+    ]):
         intent = "search"
+
     else:
         intent = "general"
 
     return {"intent": intent}
 
 # =========================
-# 2. GREETING
+# GREETING NODE
 # =========================
-def greeting_node(state: ChatState) -> dict:
+def greeting_node(state: ChatState):
     return {
-        "response": "👋 Hello! I am your FREE AI chatbot (no OpenAI needed). Ask me anything!"
+        "response":
+        "👋 Hello! I'm your Gemini + LangGraph chatbot. How can I help you today?"
     }
 
 # =========================
-# 3. QUERY EXTRACTION
+# QUERY EXTRACTION
 # =========================
-def extract_query(state: ChatState) -> dict:
-    return {"search_query": state["message"]}
+def extract_query(state: ChatState):
+    return {
+        "search_query": state["message"]
+    }
 
 # =========================
-# 4. WEB SEARCH
+# WEB SEARCH NODE
 # =========================
-def web_search_node(state: ChatState) -> dict:
+def web_search_node(state: ChatState):
+
     query = state.get("search_query") or state["message"]
 
     results = search_web(query)
@@ -81,11 +106,22 @@ def web_search_node(state: ChatState) -> dict:
     formatted_results = []
 
     for r in results:
+
         title = r.get("title", "")
-        content = r.get("content", r.get("snippet", ""))
+        content = r.get("content", "")
         url = r.get("url", "")
 
-        context += f"{title}\n{content}\n{url}\n\n"
+        context += f"""
+Title: {title}
+
+Content:
+{content}
+
+URL:
+{url}
+
+------------------------
+"""
 
         formatted_results.append({
             "title": title,
@@ -99,49 +135,62 @@ def web_search_node(state: ChatState) -> dict:
     }
 
 # =========================
-# 5. FREE RESPONSE GENERATOR (NO OPENAI)
+# RESPONSE GENERATION
 # =========================
-def generate_response(state: ChatState) -> dict:
-    """
-    FREE fallback AI logic (no API cost)
-    Uses search context to build answer
-    """
-
-    context = state.get("context", "")
+def generate_response(state: ChatState):
+    question = state["message"].strip()
+    context = state.get("context", "").strip()
+    lower = question.lower()
 
     if context:
-        response = f"""
-🧠 **Answer based on web search:**
+        return {
+            "response": (
+                "🧠 Answer based on the latest search results:\n\n"
+                f"{context}\n"
+                "If the search results do not fully answer your question, please ask again with more detail."
+            )
+        }
 
-{context}
+    if any(word in lower for word in ["love", "like", "care", "miss", "happy", "sad", "angry", "thanks", "thank you"]):
+        return {
+            "response": (
+                "🤖 I’m here to chat! Thank you for sharing.\n\n"
+                "I’m a free chatbot that can help by talking through questions and ideas, even without search results."
+            )
+        }
 
-✨ This response was generated using real-time search data (FREE mode).
-"""
-    else:
-        response = f"""
-🤖 I couldn't find web results.
+    if any(lower.startswith(w) for w in ["what", "who", "how", "why", "when", "where"]) or "?" in question:
+        return {
+            "response": (
+                "🤖 I don't have web search results available right now, but I can still help you think it through.\n\n"
+                f"You asked: {question}\n\n"
+                "Try asking for a definition, explanation, or recommendation."
+            )
+        }
 
-But here's a simple explanation for:
-👉 {state['message']}
-
-This is a free-mode response without AI model API.
-"""
-
-    return {"response": response}
+    return {
+        "response": (
+            "🤖 I’m not sure how to answer that yet, but I’m happy to keep chatting.\n\n"
+            "Ask a question, say hello, or try a different topic."
+        )
+    }
 
 # =========================
-# 6. HISTORY
+# HISTORY
 # =========================
-def update_history(state: ChatState) -> dict:
+def update_history(state: ChatState):
+
     history = state.get("conversation_history", [])
 
     history.append({
         "user": state["message"],
         "bot": state.get("response", ""),
-        "time": datetime.now().isoformat()
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
 
-    return {"conversation_history": history}
+    return {
+        "conversation_history": history
+    }
 
 # =========================
 # ROUTER
@@ -150,7 +199,7 @@ def route(state: ChatState):
     return state["intent"]
 
 # =========================
-# LANGGRAPH BUILD
+# BUILD GRAPH
 # =========================
 graph = StateGraph(ChatState)
 
@@ -178,6 +227,7 @@ graph.add_edge("search", "generate")
 
 graph.add_edge("greeting", "history")
 graph.add_edge("generate", "history")
+
 graph.add_edge("history", END)
 
 app = graph.compile()
@@ -185,35 +235,52 @@ app = graph.compile()
 # =========================
 # STREAMLIT UI
 # =========================
-st.set_page_config(page_title="FREE LangGraph Chatbot", layout="wide")
+st.set_page_config(
+    page_title="Gemini LangGraph Chatbot",
+    page_icon="🤖",
+    layout="wide"
+)
 
-st.title("🤖 FREE LangGraph Chatbot (No OpenAI)")
+st.title("🤖 Gemini + LangGraph + Tavily Chatbot")
 
-st.success("✅ Running in FREE MODE (Tavily + LangGraph)")
+st.success("✅ Gemini AI Connected")
 
 if "history" not in st.session_state:
     st.session_state.history = []
 
-message = st.text_input("Ask something:")
+if "response" not in st.session_state:
+    st.session_state.response = ""
 
-if st.button("Send") and message:
+if "last_search_results" not in st.session_state:
+    st.session_state.last_search_results = []
 
-    result = app.invoke({
-        "message": message,
-        "intent": "",
-        "search_query": "",
-        "search_results": [],
-        "context": "",
-        "response": "",
-        "conversation_history": st.session_state.history,
-        "timestamp": str(datetime.now())
-    })
+message = st.text_input("Ask anything", key="message_input")
 
-    st.session_state.history = result["conversation_history"]
+if st.button("Send"):
+    if message:
+        result = app.invoke({
+            "message": message,
+            "intent": "",
+            "search_query": "",
+            "search_results": [],
+            "context": "",
+            "response": "",
+            "conversation_history": st.session_state.history,
+            "timestamp": str(datetime.now())
+        })
 
-    st.success("Response")
-    st.markdown(result["response"])
+        st.session_state.history = result["conversation_history"]
+        st.session_state.response = result.get("response", "")
+        st.session_state.last_search_results = result.get("search_results", [])
 
-    with st.expander("Details"):
-        st.write("Intent:", result.get("intent"))
-        st.write("Search Results:", result.get("search_results", []))
+        if not st.session_state.response:
+            st.session_state.response = "No response returned from the chatbot."
+    else:
+        st.warning("Please type a message before sending.")
+
+if st.session_state.response:
+    st.markdown("### Response")
+    st.markdown(st.session_state.response)
+
+    with st.expander("Search Results"):
+        st.json(st.session_state.last_search_results or [])
